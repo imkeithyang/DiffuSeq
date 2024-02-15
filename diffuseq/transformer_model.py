@@ -7,6 +7,7 @@ import numpy as np
 import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
+from .phi import Phi
 
 from .utils.nn import (
     SiLU,
@@ -51,12 +52,11 @@ class TransformerNetModel(nn.Module):
         self.dropout = dropout
         self.logits_mode = logits_mode
         self.hidden_size = config.hidden_size
-
         self.word_embedding = nn.Embedding(vocab_size, self.input_dims)
+        print(self.word_embedding.weight.shape, input_dims, self.hidden_size)
         self.lm_head = nn.Linear(self.input_dims, vocab_size)
         with th.no_grad():
             self.lm_head.weight = self.word_embedding.weight
-
         time_embed_dim = hidden_t_dim * 4
         self.time_embed = nn.Sequential(
             linear(hidden_t_dim, time_embed_dim),
@@ -93,9 +93,37 @@ class TransformerNetModel(nn.Module):
             self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
             self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
             self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        
+            
+        elif init_pretrained == 'mv':
+            self.input_transformers = Phi(config.hidden_size, config.hidden_size)
+            
+            self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
+            self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+            self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+            
+        elif init_pretrained == 'mv-bert':
+            print('initializing from pretrained bert...')
+            temp_bert = BertModel.from_pretrained(config_name, config=config)
+
+            self.word_embedding = temp_bert.embeddings.word_embeddings
+            print(self.word_embedding.weight.shape)
+            with th.no_grad():
+                self.lm_head.weight = self.word_embedding.weight
+            # self.lm_head.weight.requires_grad = False
+            # self.word_embedding.weight.requires_grad = False
+            
+            self.input_transformers = Phi(config.hidden_size, config.hidden_size)
+            self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
+            self.position_embeddings = temp_bert.embeddings.position_embeddings
+            self.LayerNorm = temp_bert.embeddings.LayerNorm
+
+            del temp_bert.embeddings
+            del temp_bert.pooler
+            
         else:
             assert False, "invalid type of init_pretrained"
+            
+        
         
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
@@ -129,12 +157,12 @@ class TransformerNetModel(nn.Module):
         Apply the model to an input batch.
 
         :param x: an [N x C x ...] Tensor of inputs.
-        :param timesteps: a 1-D batch of timesteps.
+        :param timesteps: a 1-D batch of timßesteps.
         :return: an [N x C x ...] Tensor of outputs.
         """
         emb_t = self.time_embed(timestep_embedding(timesteps, self.hidden_t_dim))
-
         if self.input_dims != self.hidden_size:
+            print(self.input_up_proj[0].weight.shape)
             emb_x = self.input_up_proj(x)
         else:
             emb_x = x
@@ -144,9 +172,7 @@ class TransformerNetModel(nn.Module):
         # print(emb_x.shape, emb_t.shape, self.position_embeddings)
         emb_inputs = self.position_embeddings(position_ids) + emb_x + emb_t.unsqueeze(1).expand(-1, seq_length, -1)
         emb_inputs = self.dropout(self.LayerNorm(emb_inputs))
-
         input_trans_hidden_states = self.input_transformers(emb_inputs).last_hidden_state
-        
         if self.output_dims != self.hidden_size:
             h = self.output_down_proj(input_trans_hidden_states)
         else:

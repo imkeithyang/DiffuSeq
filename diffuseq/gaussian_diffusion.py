@@ -500,7 +500,7 @@ class GaussianDiffusion:
             # Lazy import so that we don't depend on tqdm.
             from tqdm.auto import tqdm
             indices = tqdm(indices)
-
+        
         for i in indices: # from T to 0
             t = th.tensor([i] * shape[0], device=device)
             if not clamp_first:

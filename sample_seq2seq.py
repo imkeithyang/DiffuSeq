@@ -152,7 +152,6 @@ def main():
         x_noised = th.where(input_ids_mask == 0, x_start, noise)
 
         model_kwargs = {}
-
         if args.step == args.diffusion_steps:
             args.use_ddim = False
             step_gap = 1
@@ -182,7 +181,6 @@ def main():
         )
 
         # print(samples[0].shape) # samples for each step
-
         sample = samples[-1]
 
         # print('decoding for seq2seq', )

@@ -7,8 +7,8 @@ sys.path.append('.')
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='training args.')
-    parser.add_argument('--dataset', type=str, default='', help='name of training dataset')
-    parser.add_argument('--data_dir', type=str, default='', help='path to training dataset')
+    parser.add_argument('--dataset', type=str, default='qqp', help='name of training dataset')
+    parser.add_argument('--data_dir', type=str, default='hpc/group/tarokhlab/hy190/data/QQP', help='path to training dataset')
 
     parser.add_argument('--noise_schedule', type=str, default='cosine', choices=['linear', 'cosine', 'sqrt', 'trunc_cos', 'trunc_lin', 'pw_lin'], help='the distribution of noises')
     parser.add_argument('--diff_steps', type=int, default=4000, help='diffusion steps')
@@ -27,7 +27,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--config_name', type=str, default='bert-base-uncased', help='config of pre-trained models')
     parser.add_argument('--vocab', type=str, default='bert', help='use bert vocab or load external vocab dict if given as path')
-    parser.add_argument('--use_plm_init', type=str, default='no', choices=['no', 'bert'], help='load init parameter from the pre-trained lm')
+    parser.add_argument('--use_plm_init', type=str, default='mv', choices=['no', 'bert', 'mv', 'mv-bert'], help='load init parameter from the pre-trained lm')
 
     parser.add_argument('--notes', type=str, default='-', help='as training notes or specifical args')
     parser.add_argument('--app', type=str, default='', help='other input args')
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     Model_FILE = f"diffuseq_{args.dataset}_h{args.hidden_dim}_lr{args.lr}" \
                 f"_t{args.diff_steps}_{args.noise_schedule}_{args.schedule_sampler}" \
-                f"_seed{args.seed}"
+                f"_seed{args.seed}_{args.use_plm_init}"
     if args.notes:
         args.notes += time.strftime("%Y%m%d-%H:%M:%S")
         Model_FILE = Model_FILE + f'_{args.notes}'
